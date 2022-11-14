@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path"
 	"strings"
 
 	"golang.org/x/crypto/bcrypt"
@@ -33,23 +32,8 @@ type authenticator struct {
 }
 
 func NewAuthenticator() *authenticator {
-	exepath, err := os.Executable()
-	if err != nil {
-		panic(err)
-	}
-	dbpath := path.Join(path.Dir(exepath), "auth.json")
-	if _, err := os.Stat(dbpath); err != nil {
-		if !errors.Is(err, os.ErrNotExist) {
-			panic(err)
-		}
-		if err := os.WriteFile(dbpath, nil, 0600); err != nil {
-			panic(err)
-		}
-	}
 	return &authenticator{
-		usersStorage: &usersStorageImpl{
-			dbpath: dbpath,
-		},
+		usersStorage: NewUsersStorageImpl(),
 	}
 }
 
@@ -57,11 +41,11 @@ func (au *authenticator) Run() (*User, error) {
 	fmt.Println("---------------------------------")
 	fmt.Println("Authenticator menu")
 	fmt.Println("---------------------------------")
-	fmt.Println("1. Login existing user")
-	fmt.Println("2. Register new user")
+	fmt.Println("1. Login")
+	fmt.Println("2. Register")
 	fmt.Println("3. Quit")
 	r := bufio.NewReader(os.Stdin)
-	fmt.Print("> ")
+	fmt.Print("\nSelect: ")
 	num, err := r.ReadString('\n')
 	if err != nil {
 		return nil, err
@@ -69,9 +53,9 @@ func (au *authenticator) Run() (*User, error) {
 	var user *User
 	switch strings.TrimSpace(num) {
 	case "1":
-		user, err = au.Register()
-	case "2":
 		user, err = au.Login()
+	case "2":
+		user, err = au.Register()
 	case "3":
 		os.Exit(0)
 	default:

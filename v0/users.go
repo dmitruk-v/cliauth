@@ -2,7 +2,9 @@ package cliauth
 
 import (
 	"encoding/json"
+	"errors"
 	"os"
+	"path"
 )
 
 type dbUser struct {
@@ -18,6 +20,25 @@ type usersStorage interface {
 
 type usersStorageImpl struct {
 	dbpath string
+}
+
+func NewUsersStorageImpl() *usersStorageImpl {
+	exepath, err := os.Executable()
+	if err != nil {
+		panic(err)
+	}
+	dbpath := path.Join(path.Dir(exepath), "auth.json")
+	if _, err := os.Stat(dbpath); err != nil {
+		if !errors.Is(err, os.ErrNotExist) {
+			panic(err)
+		}
+		if err := os.WriteFile(dbpath, nil, 0600); err != nil {
+			panic(err)
+		}
+	}
+	return &usersStorageImpl{
+		dbpath: dbpath,
+	}
 }
 
 func (stg *usersStorageImpl) getAll() ([]*dbUser, error) {
