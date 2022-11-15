@@ -2,7 +2,6 @@ package cliauth
 
 import (
 	"bufio"
-	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -44,27 +43,23 @@ func (au *authenticator) Run() (*User, error) {
 	fmt.Println("1. Login")
 	fmt.Println("2. Register")
 	fmt.Println("3. Quit")
-	r := bufio.NewReader(os.Stdin)
-	fmt.Print("\nSelect: ")
-	num, err := r.ReadString('\n')
-	if err != nil {
-		return nil, err
+	for {
+		key, err := au.readKey()
+		if err != nil {
+			return nil, err
+		}
+		switch string(key) {
+		case "1":
+			fmt.Println()
+			return au.Login()
+		case "2":
+			fmt.Println()
+			return au.Register()
+		case "3":
+			fmt.Println()
+			os.Exit(0)
+		}
 	}
-	var user *User
-	switch strings.TrimSpace(num) {
-	case "1":
-		user, err = au.Login()
-	case "2":
-		user, err = au.Register()
-	case "3":
-		os.Exit(0)
-	default:
-		return nil, errors.New("bad action")
-	}
-	if err != nil {
-		return nil, err
-	}
-	return user, nil
 }
 
 func (au *authenticator) Register() (*User, error) {
@@ -108,6 +103,9 @@ func (au *authenticator) Unregister() error {
 }
 
 func (au *authenticator) registerAction(creds registerCredentials) (*User, error) {
+	if len(creds.login) == 0 {
+		return nil, ErrEmptyLogin
+	}
 	fmt.Println("Checking passwords...")
 	if creds.password != creds.passwordRep {
 		return nil, ErrPasswordsNotEqual
@@ -190,4 +188,20 @@ func (au *authenticator) askLoginCreds() (loginCredentials, error) {
 	creds.login = strings.TrimSpace(login)
 	creds.password = strings.TrimSpace(string(password))
 	return creds, nil
+}
+
+func (au *authenticator) readKey() (byte, error) {
+	// switch stdin into 'raw' mode
+	oldState, err := term.MakeRaw(int(os.Stdin.Fd()))
+	if err != nil {
+		return 0, err
+	}
+	defer term.Restore(int(os.Stdin.Fd()), oldState)
+
+	b := make([]byte, 1)
+	_, err = os.Stdin.Read(b)
+	if err != nil {
+		return 0, err
+	}
+	return b[0], nil
 }
