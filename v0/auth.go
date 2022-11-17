@@ -2,10 +2,12 @@ package cliauth
 
 import (
 	"bufio"
+	"bytes"
 	"fmt"
 	"os"
 	"strings"
 
+	"github.com/inancgumus/screen"
 	"golang.org/x/crypto/bcrypt"
 	"golang.org/x/term"
 )
@@ -37,55 +39,66 @@ func NewAuthenticator() *authenticator {
 }
 
 func (au *authenticator) Run() (*User, error) {
-	fmt.Println("---------------------------------")
-	fmt.Println("Authenticator menu")
-	fmt.Println("---------------------------------")
+	formatError := func(err error) error {
+		return fmt.Errorf("[AUTH ERROR]: %v", err)
+	}
+	screen.Clear()
+	screen.MoveTopLeft()
+	fmt.Printf("\n--- Authenticator menu ---\n\n")
 	fmt.Println("1. Login")
 	fmt.Println("2. Register")
 	fmt.Println("3. Quit")
+	fmt.Println()
 	for {
-		key, err := au.readKey()
+		var (
+			err  error
+			user *User
+		)
+		key, err := au.askAction()
 		if err != nil {
-			return nil, err
+			return nil, formatError(err)
 		}
-		switch string(key) {
+		switch key {
 		case "1":
 			fmt.Println()
-			return au.Login()
+			user, err = au.Login()
 		case "2":
 			fmt.Println()
-			return au.Register()
+			user, err = au.Register()
 		case "3":
 			fmt.Println()
 			os.Exit(0)
+		default:
+			continue
 		}
+		if err != nil {
+			return nil, formatError(err)
+		}
+		screen.Clear()
+		screen.MoveTopLeft()
+		return user, nil
 	}
 }
 
 func (au *authenticator) Register() (*User, error) {
 	formatError := func(err error) error {
-		return fmt.Errorf("[ERROR]: register: %v", err)
+		return fmt.Errorf("register: %v", err)
 	}
-	fmt.Println("---------------------------------")
-	fmt.Println("New user registration")
-	fmt.Println("---------------------------------")
+	fmt.Printf("--- New user registration ---\n\n")
 	creds, err := au.askRegisterCreds()
 	if err != nil {
 		return nil, formatError(err)
 	}
-	fmt.Println("--- *** ---")
 	user, err := au.registerAction(creds)
 	if err != nil {
 		return nil, formatError(err)
 	}
-	fmt.Println("Done!")
-	fmt.Println("---------------------------------")
 	return user, nil
 }
 
 func (au *authenticator) Login() (*User, error) {
 	formatError := func(err error) error {
-		return fmt.Errorf("[ERROR]: login: %v", err)
+		return fmt.Errorf("login: %v", err)
 	}
 	creds, err := au.askLoginCreds()
 	if err != nil {
@@ -106,11 +119,9 @@ func (au *authenticator) registerAction(creds registerCredentials) (*User, error
 	if len(creds.login) == 0 {
 		return nil, ErrEmptyLogin
 	}
-	fmt.Println("Checking passwords...")
 	if creds.password != creds.passwordRep {
 		return nil, ErrPasswordsNotEqual
 	}
-	fmt.Println("Generating hash...")
 	hash, err := bcrypt.GenerateFromPassword([]byte(creds.password), 12)
 	if err != nil {
 		return nil, err
@@ -119,7 +130,6 @@ func (au *authenticator) registerAction(creds registerCredentials) (*User, error
 		Login: creds.login,
 		Hash:  string(hash),
 	}
-	fmt.Println("Saving user...")
 	if err := au.usersStorage.save(dbuser); err != nil {
 		return nil, err
 	}
@@ -145,6 +155,16 @@ func (au *authenticator) loginAction(creds loginCredentials) (*User, error) {
 	return user, nil
 }
 
+func (au *authenticator) askAction() (string, error) {
+	key := make([]byte, 2)
+	fmt.Print("> ")
+	_, err := os.Stdin.Read(key)
+	if err != nil {
+		return "", err
+	}
+	return string(bytes.TrimSpace(key)), nil
+}
+
 func (au *authenticator) askRegisterCreds() (registerCredentials, error) {
 	var creds registerCredentials
 	r := bufio.NewReader(os.Stdin)
@@ -154,13 +174,13 @@ func (au *authenticator) askRegisterCreds() (registerCredentials, error) {
 		return creds, err
 	}
 	fmt.Print("Password: ")
-	password, err := term.ReadPassword(0)
+	password, err := term.ReadPassword(int(os.Stdin.Fd()))
 	if err != nil {
 		return creds, err
 	}
 	fmt.Println()
 	fmt.Print("Repeat password: ")
-	passwordRep, err := term.ReadPassword(0)
+	passwordRep, err := term.ReadPassword(int(os.Stdin.Fd()))
 	if err != nil {
 		return creds, err
 	}
@@ -180,7 +200,7 @@ func (au *authenticator) askLoginCreds() (loginCredentials, error) {
 		return creds, err
 	}
 	fmt.Print("Password: ")
-	password, err := term.ReadPassword(0)
+	password, err := term.ReadPassword(int(os.Stdin.Fd()))
 	if err != nil {
 		return creds, err
 	}
@@ -188,20 +208,4 @@ func (au *authenticator) askLoginCreds() (loginCredentials, error) {
 	creds.login = strings.TrimSpace(login)
 	creds.password = strings.TrimSpace(string(password))
 	return creds, nil
-}
-
-func (au *authenticator) readKey() (byte, error) {
-	// switch stdin into 'raw' mode
-	oldState, err := term.MakeRaw(int(os.Stdin.Fd()))
-	if err != nil {
-		return 0, err
-	}
-	defer term.Restore(int(os.Stdin.Fd()), oldState)
-
-	b := make([]byte, 1)
-	_, err = os.Stdin.Read(b)
-	if err != nil {
-		return 0, err
-	}
-	return b[0], nil
 }
