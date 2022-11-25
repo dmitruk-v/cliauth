@@ -42,13 +42,7 @@ func (au *authenticator) Run() (*User, error) {
 	formatError := func(err error) error {
 		return fmt.Errorf("[AUTH ERROR]: %v", err)
 	}
-	screen.Clear()
-	screen.MoveTopLeft()
-	fmt.Printf("\n--- Authenticator menu ---\n\n")
-	fmt.Println("1. Login")
-	fmt.Println("2. Register")
-	fmt.Println("3. Quit")
-	fmt.Println()
+	au.printMenu()
 	for {
 		var (
 			err  error
@@ -60,13 +54,10 @@ func (au *authenticator) Run() (*User, error) {
 		}
 		switch key {
 		case "1":
-			fmt.Println()
 			user, err = au.Login()
 		case "2":
-			fmt.Println()
 			user, err = au.Register()
 		case "3":
-			fmt.Println()
 			os.Exit(0)
 		default:
 			continue
@@ -74,17 +65,23 @@ func (au *authenticator) Run() (*User, error) {
 		if err != nil {
 			return nil, formatError(err)
 		}
-		screen.Clear()
-		screen.MoveTopLeft()
 		return user, nil
 	}
+}
+
+func (au *authenticator) printMenu() {
+	au.clearConsole()
+	fmt.Printf("\n--- Authenticator menu ---\n\n")
+	fmt.Println("1. Login")
+	fmt.Println("2. Register")
+	fmt.Println("3. Quit")
+	fmt.Println()
 }
 
 func (au *authenticator) Register() (*User, error) {
 	formatError := func(err error) error {
 		return fmt.Errorf("register: %v", err)
 	}
-	fmt.Printf("--- New user registration ---\n\n")
 	creds, err := au.askRegisterCreds()
 	if err != nil {
 		return nil, formatError(err)
@@ -208,4 +205,9 @@ func (au *authenticator) askLoginCreds() (loginCredentials, error) {
 	creds.login = strings.TrimSpace(login)
 	creds.password = strings.TrimSpace(string(password))
 	return creds, nil
+}
+
+func (au *authenticator) clearConsole() {
+	screen.Clear()
+	screen.MoveTopLeft()
 }
